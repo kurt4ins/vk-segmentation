@@ -15,6 +15,7 @@ type RouterDeps struct {
 	Logger     *slog.Logger
 	ReportsDir string
 	Segment    *handler.SegmentHandler
+	User       *handler.UserHandler
 }
 
 func NewRouter(deps RouterDeps) http.Handler {
@@ -31,6 +32,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		if deps.Segment != nil {
 			deps.Segment.Register(r)
+		}
+		if deps.User != nil {
+			deps.User.Register(r)
 		}
 	})
 

@@ -8,3 +8,8 @@ type UserSegment struct {
 	ExpiresAt *time.Time
 	CreatedAt time.Time
 }
+
+type ActiveSegment struct {
+	Slug      string
+	ExpiresAt *time.Time
+}
