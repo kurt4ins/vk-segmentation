@@ -17,3 +17,8 @@ type ActiveSegment struct {
 	Slug      string
 	ExpiresAt *time.Time
 }
+
+type ExpiredMembership struct {
+	UserID uuid.UUID
+	Slug   string
+}

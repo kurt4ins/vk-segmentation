@@ -79,6 +79,35 @@ func (r *MembershipRepo) BatchAddUsers(ctx context.Context, segmentID int64, use
 	return added, nil
 }
 
+func (r *MembershipRepo) DeleteExpired(ctx context.Context) ([]domain.ExpiredMembership, error) {
+	const q = `
+		DELETE FROM user_segments us
+		USING segments s
+		WHERE us.segment_id = s.id
+		  AND us.expires_at IS NOT NULL
+		  AND us.expires_at <= now()
+		RETURNING us.user_id, s.slug`
+
+	rows, err := r.querier(ctx).Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: delete expired memberships: %w", err)
+	}
+	defer rows.Close()
+
+	expired := make([]domain.ExpiredMembership, 0)
+	for rows.Next() {
+		var e domain.ExpiredMembership
+		if err := rows.Scan(&e.UserID, &e.Slug); err != nil {
+			return nil, fmt.Errorf("postgres: scan expired membership: %w", err)
+		}
+		expired = append(expired, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: delete expired memberships rows: %w", err)
+	}
+	return expired, nil
+}
+
 func (r *MembershipRepo) ListActive(ctx context.Context, userID uuid.UUID) ([]domain.ActiveSegment, error) {
 	const q = `
 		SELECT s.slug, us.expires_at

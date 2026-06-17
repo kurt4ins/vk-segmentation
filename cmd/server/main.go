@@ -59,13 +59,16 @@ func run() error {
 	rolloutService := service.NewRolloutService(userRepo, membershipRepo, historyRepo, segmentRepo, transactor, cfg.RolloutBatchSize)
 	rolloutWorker := worker.NewRolloutWorker(rolloutService, log)
 
-	workerCtx, cancelWorker := context.WithCancel(ctx)
-	defer cancelWorker()
-	go rolloutWorker.Run(workerCtx)
-
 	segmentService := service.NewSegmentService(segmentRepo, historyRepo, transactor, rolloutWorker)
 	userService := service.NewUserService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
 	membershipService := service.NewMembershipService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
+
+	ttlCleaner := worker.NewTTLCleaner(membershipService, cfg.TTLCleanInterval, log)
+
+	workerCtx, cancelWorker := context.WithCancel(ctx)
+	defer cancelWorker()
+	go rolloutWorker.Run(workerCtx)
+	go ttlCleaner.Run(workerCtx)
 
 	segmentHandler := handler.NewSegmentHandler(segmentService)
 	userHandler := handler.NewUserHandler(userService, membershipService)
@@ -105,10 +108,18 @@ func run() error {
 	}
 
 	cancelWorker()
-	select {
-	case <-rolloutWorker.Done():
-	case <-time.After(15 * time.Second):
-		log.Warn("rollout worker did not stop in time")
+	for _, wk := range []struct {
+		name string
+		done <-chan struct{}
+	}{
+		{"rollout worker", rolloutWorker.Done()},
+		{"ttl cleaner", ttlCleaner.Done()},
+	} {
+		select {
+		case <-wk.done:
+		case <-time.After(15 * time.Second):
+			log.Warn("worker did not stop in time", "worker", wk.name)
+		}
 	}
 
 	log.Info("server stopped")
