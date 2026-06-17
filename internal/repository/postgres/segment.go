@@ -67,6 +67,41 @@ func (r *SegmentRepo) List(ctx context.Context) ([]domain.Segment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list segments: %w", err)
 	}
+	return scanSegments(rows)
+}
+
+func (r *SegmentRepo) ListBySlugs(ctx context.Context, slugs []string) ([]domain.Segment, error) {
+	if len(slugs) == 0 {
+		return nil, nil
+	}
+
+	const q = `
+		SELECT id, slug, auto_assign_percent, created_at, deleted_at
+		FROM segments
+		WHERE slug = ANY($1::text[]) AND deleted_at IS NULL`
+
+	rows, err := r.querier(ctx).Query(ctx, q, slugs)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list segments by slugs: %w", err)
+	}
+	return scanSegments(rows)
+}
+
+func (r *SegmentRepo) ListPercentSegments(ctx context.Context) ([]domain.Segment, error) {
+	const q = `
+		SELECT id, slug, auto_assign_percent, created_at, deleted_at
+		FROM segments
+		WHERE auto_assign_percent IS NOT NULL AND deleted_at IS NULL
+		ORDER BY id`
+
+	rows, err := r.querier(ctx).Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list percent segments: %w", err)
+	}
+	return scanSegments(rows)
+}
+
+func scanSegments(rows pgx.Rows) ([]domain.Segment, error) {
 	defer rows.Close()
 
 	segments := make([]domain.Segment, 0)
@@ -78,7 +113,7 @@ func (r *SegmentRepo) List(ctx context.Context) ([]domain.Segment, error) {
 		segments = append(segments, seg)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("postgres: list segments rows: %w", err)
+		return nil, fmt.Errorf("postgres: scan segments rows: %w", err)
 	}
 	return segments, nil
 }

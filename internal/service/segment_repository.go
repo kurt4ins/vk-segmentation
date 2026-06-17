@@ -13,4 +13,6 @@ type SegmentRepository interface {
 	SoftDelete(ctx context.Context, segmentID int64) error
 	ListMemberUserIDs(ctx context.Context, segmentID int64) ([]int64, error)
 	DeleteMembershipsBySegment(ctx context.Context, segmentID int64) error
+	ListBySlugs(ctx context.Context, slugs []string) ([]domain.Segment, error)
+	ListPercentSegments(ctx context.Context) ([]domain.Segment, error)
 }

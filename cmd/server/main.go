@@ -52,15 +52,21 @@ func run() error {
 	transactor := postgres.NewTransactor(pool)
 	segmentRepo := postgres.NewSegmentRepo(pool)
 	historyRepo := postgres.NewHistoryRepo(pool)
+	userRepo := postgres.NewUserRepo(pool)
+	membershipRepo := postgres.NewMembershipRepo(pool)
 
 	segmentService := service.NewSegmentService(segmentRepo, historyRepo, transactor)
+	userService := service.NewUserService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
+	membershipService := service.NewMembershipService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
 
 	segmentHandler := handler.NewSegmentHandler(segmentService)
+	userHandler := handler.NewUserHandler(userService, membershipService)
 
 	router := httptransport.NewRouter(httptransport.RouterDeps{
 		Logger:     log,
 		ReportsDir: cfg.ReportsDir,
 		Segment:    segmentHandler,
+		User:       userHandler,
 	})
 
 	srv := &http.Server{
