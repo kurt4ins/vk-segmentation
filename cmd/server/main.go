@@ -12,7 +12,9 @@ import (
 	"github.com/kurt4ins/vk-segmentation/internal/config"
 	"github.com/kurt4ins/vk-segmentation/internal/pkg/logger"
 	"github.com/kurt4ins/vk-segmentation/internal/repository/postgres"
+	"github.com/kurt4ins/vk-segmentation/internal/service"
 	httptransport "github.com/kurt4ins/vk-segmentation/internal/transport/http"
+	"github.com/kurt4ins/vk-segmentation/internal/transport/http/handler"
 )
 
 func main() {
@@ -47,9 +49,18 @@ func run() error {
 	defer pool.Close()
 	log.Info("connected to postgres")
 
+	transactor := postgres.NewTransactor(pool)
+	segmentRepo := postgres.NewSegmentRepo(pool)
+	historyRepo := postgres.NewHistoryRepo(pool)
+
+	segmentService := service.NewSegmentService(segmentRepo, historyRepo, transactor)
+
+	segmentHandler := handler.NewSegmentHandler(segmentService)
+
 	router := httptransport.NewRouter(httptransport.RouterDeps{
 		Logger:     log,
 		ReportsDir: cfg.ReportsDir,
+		Segment:    segmentHandler,
 	})
 
 	srv := &http.Server{
