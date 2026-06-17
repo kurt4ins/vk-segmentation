@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: VK Segmentation Service
+  description: |
+    Service for managing user segments: segment CRUD, atomic membership
+    add/remove with audit history, materialized percent rollout, TTL'd
+    memberships, and CSV history reports.
+  version: "1.0.0"
+
+servers:
+  - url: /api/v1
+
+paths:
+  /segments:
+    post:
+      summary: Create a segment
+      description: |
+        Creates a segment. If `auto_assign_percent` is set, an asynchronous
+        rollout is enqueued and the segment is returned with status `pending`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSegmentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "400":
+          description: Invalid slug or percent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Segment already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: List segments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Segment"
+
+  /segments/{slug}:
+    delete:
+      summary: Soft-delete a segment
+      description: |
+        Soft-deletes the segment and cascades: removes it from all users and
+        writes a `remove` history row per affected user, in one transaction.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            example: MAIL_GPT
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Segment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users:
+    post:
+      summary: Register a user
+      description: |
+        Creates a user (UUIDv7 id). For each percent segment, a dice roll
+        (`random() < P/100`) decides membership so new users join existing
+        rollouts.
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}/segments:
+    post:
+      summary: Update a user's segments
+      description: |
+        Atomically adds and/or removes segments. Idempotent: re-adding an
+        existing membership or removing a non-member is a safe no-op. The same
+        slug may not appear in both `add` and `remove`.
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSegmentsRequest"
+      responses:
+        "200":
+          description: Current active segments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActiveSegment"
+        "400":
+          description: Validation error (unknown slug, or slug in both add and remove, or bad ttl)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: Get a user's active segments
+      description: The main read path. TTL is enforced at read time.
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActiveSegment"
+
+  /users/{id}/history:
+    get:
+      summary: Generate a CSV history report
+      description: |
+        Generates a CSV (`user_id;slug;operation;datetime`) for the user over an
+        optional time range and returns a link to the downloadable file.
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            description: RFC3339 timestamp or YYYY-MM-DD. Defaults to the beginning of time.
+            example: "2026-01-01T00:00:00Z"
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            description: RFC3339 timestamp or YYYY-MM-DD. Defaults to now.
+            example: "2026-12-31"
+      responses:
+        "200":
+          description: Link to the generated CSV
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+        "400":
+          description: Invalid time parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  parameters:
+    UserID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        example: 019ed7b6-5c18-79ce-8080-53833d202751
+
+  schemas:
+    CreateSegmentRequest:
+      type: object
+      required: [slug]
+      properties:
+        slug:
+          type: string
+          pattern: "^[A-Z0-9_]{1,100}$"
+          example: MAIL_GPT
+        auto_assign_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          example: 50
+
+    Segment:
+      type: object
+      properties:
+        slug:
+          type: string
+          example: MAIL_GPT
+        auto_assign_percent:
+          type: integer
+          nullable: true
+          example: 50
+        status:
+          type: string
+          enum: [pending, applied]
+        created_at:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    UpdateSegmentsRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items:
+            type: string
+          example: ["MAIL_GPT"]
+        remove:
+          type: array
+          items:
+            type: string
+          example: ["VOICE_MSG"]
+        ttl:
+          type: string
+          description: Go duration string applied to added memberships, e.g. "24h".
+          example: "24h"
+
+    ActiveSegment:
+      type: object
+      properties:
+        slug:
+          type: string
+          example: MAIL_GPT
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ReportResponse:
+      type: object
+      properties:
+        link:
+          type: string
+          example: /reports/history_019ed7b6_1781735513209670016.csv
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: validation_error
+            message:
+              type: string

@@ -29,7 +29,7 @@ migrate-down:
 	goose -dir $(MIGRATIONS) postgres "$(DB_DSN)" down
 
 mocks:
-	mockery
+	go generate ./...
 
 swagger:
 	@echo "Swagger spec is hand-written at api/openapi.yaml and served at /swagger"
