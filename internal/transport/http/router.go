@@ -7,12 +7,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/kurt4ins/vk-segmentation/internal/transport/http/handler"
 	mw "github.com/kurt4ins/vk-segmentation/internal/transport/http/middleware"
 )
 
 type RouterDeps struct {
 	Logger     *slog.Logger
 	ReportsDir string
+	Segment    *handler.SegmentHandler
 }
 
 func NewRouter(deps RouterDeps) http.Handler {
@@ -27,7 +29,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
-		_ = r
+		if deps.Segment != nil {
+			deps.Segment.Register(r)
+		}
 	})
 
 	return r
