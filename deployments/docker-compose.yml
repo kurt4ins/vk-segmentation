@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in deployments/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deployments/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-segmentation}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-segmentation}?sslmode=disable
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TTL_CLEAN_INTERVAL: ${TTL_CLEAN_INTERVAL:-1m}
+      ROLLOUT_BATCH_SIZE: ${ROLLOUT_BATCH_SIZE:-1000}
+      REPORTS_DIR: ${REPORTS_DIR:-/app/reports}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    volumes:
+      - reports:/app/reports
+
+volumes:
+  pgdata:
+  reports:
