@@ -38,6 +38,27 @@ func (s *MembershipService) ListActive(ctx context.Context, userID uuid.UUID) ([
 	return s.memberships.ListActive(ctx, userID)
 }
 
+func (s *MembershipService) CleanExpired(ctx context.Context) (int, error) {
+	var removed int
+	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		expired, err := s.memberships.DeleteExpired(ctx)
+		if err != nil {
+			return err
+		}
+		if len(expired) == 0 {
+			return nil
+		}
+
+		records := make([]domain.HistoryRecord, len(expired))
+		for i, e := range expired {
+			records[i] = domain.HistoryRecord{UserID: e.UserID, Slug: e.Slug, Operation: domain.OpRemove}
+		}
+		removed = len(expired)
+		return s.history.BatchInsert(ctx, records)
+	})
+	return removed, err
+}
+
 func (s *MembershipService) UpdateSegments(
 	ctx context.Context,
 	userID uuid.UUID,

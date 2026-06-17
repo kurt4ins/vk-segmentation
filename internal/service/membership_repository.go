@@ -14,4 +14,5 @@ type MembershipRepository interface {
 	BatchDelete(ctx context.Context, userID uuid.UUID, segmentIDs []int64) ([]int64, error)
 	ListActive(ctx context.Context, userID uuid.UUID) ([]domain.ActiveSegment, error)
 	BatchAddUsers(ctx context.Context, segmentID int64, userIDs []uuid.UUID) ([]uuid.UUID, error)
+	DeleteExpired(ctx context.Context) ([]domain.ExpiredMembership, error)
 }
