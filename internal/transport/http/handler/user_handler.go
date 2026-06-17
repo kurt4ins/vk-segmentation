@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
 	"github.com/kurt4ins/vk-segmentation/internal/pkg/errmap"
@@ -19,8 +19,8 @@ type UserService interface {
 }
 
 type MembershipService interface {
-	UpdateSegments(ctx context.Context, userID int64, add, remove []string, ttl *time.Duration) ([]domain.ActiveSegment, error)
-	ListActive(ctx context.Context, userID int64) ([]domain.ActiveSegment, error)
+	UpdateSegments(ctx context.Context, userID uuid.UUID, add, remove []string, ttl *time.Duration) ([]domain.ActiveSegment, error)
+	ListActive(ctx context.Context, userID uuid.UUID) ([]domain.ActiveSegment, error)
 }
 
 type UserHandler struct {
@@ -86,12 +86,12 @@ func (h *UserHandler) getSegments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, dto.NewActiveSegmentResponses(active))
 }
 
-func parseUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+func parseUserID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	raw := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id <= 0 {
+	id, err := uuid.Parse(raw)
+	if err != nil {
 		errmap.WriteCode(w, http.StatusBadRequest, "bad_request", "invalid user id")
-		return 0, false
+		return uuid.UUID{}, false
 	}
 	return id, true
 }

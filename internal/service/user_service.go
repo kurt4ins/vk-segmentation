@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math/rand/v2"
+
+	"github.com/google/uuid"
 
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
 )
@@ -45,9 +48,14 @@ func NewUserService(
 }
 
 func (s *UserService) Register(ctx context.Context) (domain.User, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return domain.User{}, fmt.Errorf("generate user id: %w", err)
+	}
+
 	var user domain.User
-	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		u, err := s.users.Create(ctx)
+	err = s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		u, err := s.users.Create(ctx, id)
 		if err != nil {
 			return err
 		}

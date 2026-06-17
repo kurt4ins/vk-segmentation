@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
 )
 
 type UserResponse struct {
-	ID        int64     `json:"id"`
+	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

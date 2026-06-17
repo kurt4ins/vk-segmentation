@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
@@ -22,7 +23,7 @@ func (r *HistoryRepo) BatchInsert(ctx context.Context, records []domain.HistoryR
 		return nil
 	}
 
-	userIDs := make([]int64, len(records))
+	userIDs := make([]uuid.UUID, len(records))
 	slugs := make([]string, len(records))
 	ops := make([]string, len(records))
 	for i, rec := range records {
@@ -33,7 +34,7 @@ func (r *HistoryRepo) BatchInsert(ctx context.Context, records []domain.HistoryR
 
 	const q = `
 		INSERT INTO segment_history (user_id, slug, operation)
-		SELECT * FROM unnest($1::bigint[], $2::text[], $3::text[])`
+		SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[])`
 
 	if _, err := r.querier(ctx).Exec(ctx, q, userIDs, slugs, ops); err != nil {
 		return fmt.Errorf("postgres: batch insert history: %w", err)

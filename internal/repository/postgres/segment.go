@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -126,7 +127,7 @@ func (r *SegmentRepo) SoftDelete(ctx context.Context, segmentID int64) error {
 	return nil
 }
 
-func (r *SegmentRepo) ListMemberUserIDs(ctx context.Context, segmentID int64) ([]int64, error) {
+func (r *SegmentRepo) ListMemberUserIDs(ctx context.Context, segmentID int64) ([]uuid.UUID, error) {
 	const q = `SELECT user_id FROM user_segments WHERE segment_id = $1`
 
 	rows, err := r.querier(ctx).Query(ctx, q, segmentID)
@@ -135,9 +136,9 @@ func (r *SegmentRepo) ListMemberUserIDs(ctx context.Context, segmentID int64) ([
 	}
 	defer rows.Close()
 
-	ids := make([]int64, 0)
+	ids := make([]uuid.UUID, 0)
 	for rows.Next() {
-		var id int64
+		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
 			return nil, fmt.Errorf("postgres: scan member user id: %w", err)
 		}
