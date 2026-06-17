@@ -10,10 +10,11 @@ type SegmentService struct {
 	segments SegmentRepository
 	history  HistoryRepository
 	tx       Transactor
+	rollout  RolloutEnqueuer
 }
 
-func NewSegmentService(segments SegmentRepository, history HistoryRepository, tx Transactor) *SegmentService {
-	return &SegmentService{segments: segments, history: history, tx: tx}
+func NewSegmentService(segments SegmentRepository, history HistoryRepository, tx Transactor, rollout RolloutEnqueuer) *SegmentService {
+	return &SegmentService{segments: segments, history: history, tx: tx, rollout: rollout}
 }
 
 func (s *SegmentService) Create(ctx context.Context, slug string, autoPercent *int) (domain.Segment, error) {
@@ -23,7 +24,16 @@ func (s *SegmentService) Create(ctx context.Context, slug string, autoPercent *i
 	if err := domain.ValidatePercent(autoPercent); err != nil {
 		return domain.Segment{}, err
 	}
-	return s.segments.Create(ctx, slug, autoPercent)
+
+	seg, err := s.segments.Create(ctx, slug, autoPercent)
+	if err != nil {
+		return domain.Segment{}, err
+	}
+
+	if seg.AutoAssignPercent != nil && s.rollout != nil {
+		s.rollout.Enqueue(seg)
+	}
+	return seg, nil
 }
 
 func (s *SegmentService) List(ctx context.Context) ([]domain.Segment, error) {

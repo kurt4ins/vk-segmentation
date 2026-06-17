@@ -47,6 +47,38 @@ func (r *MembershipRepo) BatchDelete(ctx context.Context, userID uuid.UUID, segm
 	return r.queryIDs(ctx, q, userID, segmentIDs)
 }
 
+func (r *MembershipRepo) BatchAddUsers(ctx context.Context, segmentID int64, userIDs []uuid.UUID) ([]uuid.UUID, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+
+	const q = `
+		INSERT INTO user_segments (user_id, segment_id)
+		SELECT uid, $1
+		FROM unnest($2::uuid[]) AS uid
+		ON CONFLICT (user_id, segment_id) DO NOTHING
+		RETURNING user_id`
+
+	rows, err := r.querier(ctx).Query(ctx, q, segmentID, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: batch add users: %w", err)
+	}
+	defer rows.Close()
+
+	added := make([]uuid.UUID, 0, len(userIDs))
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("postgres: scan added user id: %w", err)
+		}
+		added = append(added, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: batch add users rows: %w", err)
+	}
+	return added, nil
+}
+
 func (r *MembershipRepo) ListActive(ctx context.Context, userID uuid.UUID) ([]domain.ActiveSegment, error) {
 	const q = `
 		SELECT s.slug, us.expires_at
