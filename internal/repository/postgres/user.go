@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
@@ -17,17 +18,17 @@ func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
 	return &UserRepo{base{pool: pool}}
 }
 
-func (r *UserRepo) Create(ctx context.Context) (domain.User, error) {
-	const q = `INSERT INTO users DEFAULT VALUES RETURNING user_id, created_at`
+func (r *UserRepo) Create(ctx context.Context, id uuid.UUID) (domain.User, error) {
+	const q = `INSERT INTO users (user_id) VALUES ($1) RETURNING user_id, created_at`
 
 	var u domain.User
-	if err := r.querier(ctx).QueryRow(ctx, q).Scan(&u.ID, &u.CreatedAt); err != nil {
+	if err := r.querier(ctx).QueryRow(ctx, q, id).Scan(&u.ID, &u.CreatedAt); err != nil {
 		return domain.User{}, fmt.Errorf("postgres: create user: %w", err)
 	}
 	return u, nil
 }
 
-func (r *UserRepo) Exists(ctx context.Context, userID int64) (bool, error) {
+func (r *UserRepo) Exists(ctx context.Context, userID uuid.UUID) (bool, error) {
 	const q = `SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1)`
 
 	var exists bool

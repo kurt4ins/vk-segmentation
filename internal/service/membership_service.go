@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
 )
 
@@ -32,13 +34,13 @@ func NewMembershipService(
 	}
 }
 
-func (s *MembershipService) ListActive(ctx context.Context, userID int64) ([]domain.ActiveSegment, error) {
+func (s *MembershipService) ListActive(ctx context.Context, userID uuid.UUID) ([]domain.ActiveSegment, error) {
 	return s.memberships.ListActive(ctx, userID)
 }
 
 func (s *MembershipService) UpdateSegments(
 	ctx context.Context,
-	userID int64,
+	userID uuid.UUID,
 	add []string,
 	remove []string,
 	ttl *time.Duration,

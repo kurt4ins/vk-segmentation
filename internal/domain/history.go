@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Operation string
 
@@ -11,7 +15,7 @@ const (
 
 type HistoryRecord struct {
 	ID        int64
-	UserID    int64
+	UserID    uuid.UUID
 	Slug      string
 	Operation Operation
 	CreatedAt time.Time

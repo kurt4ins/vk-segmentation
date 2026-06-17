@@ -1,7 +1,7 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE users (
-    user_id    BIGSERIAL   PRIMARY KEY,
+    user_id    UUID        PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -14,7 +14,7 @@ CREATE TABLE segments (
 );
 
 CREATE TABLE user_segments (
-    user_id    BIGINT      NOT NULL REFERENCES users (user_id),
+    user_id    UUID        NOT NULL REFERENCES users (user_id),
     segment_id BIGINT      NOT NULL REFERENCES segments (id),
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -27,7 +27,7 @@ CREATE INDEX idx_user_segments_user_id ON user_segments (user_id);
 -- History stores the slug (not an FK) so the audit trail survives segment deletion.
 CREATE TABLE segment_history (
     id         BIGSERIAL   PRIMARY KEY,
-    user_id    BIGINT      NOT NULL,
+    user_id    UUID        NOT NULL,
     slug       TEXT        NOT NULL,
     operation  TEXT        NOT NULL CHECK (operation IN ('add', 'remove')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

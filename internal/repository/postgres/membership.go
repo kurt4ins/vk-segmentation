@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kurt4ins/vk-segmentation/internal/domain"
@@ -18,7 +19,7 @@ func NewMembershipRepo(pool *pgxpool.Pool) *MembershipRepo {
 	return &MembershipRepo{base{pool: pool}}
 }
 
-func (r *MembershipRepo) BatchInsert(ctx context.Context, userID int64, segmentIDs []int64, expiresAt *time.Time) ([]int64, error) {
+func (r *MembershipRepo) BatchInsert(ctx context.Context, userID uuid.UUID, segmentIDs []int64, expiresAt *time.Time) ([]int64, error) {
 	if len(segmentIDs) == 0 {
 		return nil, nil
 	}
@@ -33,7 +34,7 @@ func (r *MembershipRepo) BatchInsert(ctx context.Context, userID int64, segmentI
 	return r.queryIDs(ctx, q, userID, segmentIDs, expiresAt)
 }
 
-func (r *MembershipRepo) BatchDelete(ctx context.Context, userID int64, segmentIDs []int64) ([]int64, error) {
+func (r *MembershipRepo) BatchDelete(ctx context.Context, userID uuid.UUID, segmentIDs []int64) ([]int64, error) {
 	if len(segmentIDs) == 0 {
 		return nil, nil
 	}
@@ -46,7 +47,7 @@ func (r *MembershipRepo) BatchDelete(ctx context.Context, userID int64, segmentI
 	return r.queryIDs(ctx, q, userID, segmentIDs)
 }
 
-func (r *MembershipRepo) ListActive(ctx context.Context, userID int64) ([]domain.ActiveSegment, error) {
+func (r *MembershipRepo) ListActive(ctx context.Context, userID uuid.UUID) ([]domain.ActiveSegment, error) {
 	const q = `
 		SELECT s.slug, us.expires_at
 		FROM user_segments us

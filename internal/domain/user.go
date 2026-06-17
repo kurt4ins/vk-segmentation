@@ -3,10 +3,12 @@ package domain
 import (
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	ID        int64
+	ID        uuid.UUID
 	CreatedAt time.Time
 }
 

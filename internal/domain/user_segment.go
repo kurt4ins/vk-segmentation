@@ -1,9 +1,13 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type UserSegment struct {
-	UserID    int64
+	UserID    uuid.UUID
 	SegmentID int64
 	ExpiresAt *time.Time
 	CreatedAt time.Time
