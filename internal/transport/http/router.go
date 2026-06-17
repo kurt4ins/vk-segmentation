@@ -16,6 +16,7 @@ type RouterDeps struct {
 	ReportsDir string
 	Segment    *handler.SegmentHandler
 	User       *handler.UserHandler
+	History    *handler.HistoryHandler
 }
 
 func NewRouter(deps RouterDeps) http.Handler {
@@ -29,12 +30,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/healthz", healthz)
 	r.Handle("/metrics", promhttp.Handler())
 
+	if deps.ReportsDir != "" {
+		fs := http.FileServer(http.Dir(deps.ReportsDir))
+		r.Handle(handler.ReportsURLPrefix+"*", http.StripPrefix(handler.ReportsURLPrefix, fs))
+	}
+
 	r.Route("/api/v1", func(r chi.Router) {
 		if deps.Segment != nil {
 			deps.Segment.Register(r)
 		}
 		if deps.User != nil {
 			deps.User.Register(r)
+		}
+		if deps.History != nil {
+			deps.History.Register(r)
 		}
 	})
 

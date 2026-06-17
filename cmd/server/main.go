@@ -62,6 +62,7 @@ func run() error {
 	segmentService := service.NewSegmentService(segmentRepo, historyRepo, transactor, rolloutWorker)
 	userService := service.NewUserService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
 	membershipService := service.NewMembershipService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
+	historyService := service.NewHistoryService(historyRepo, cfg.ReportsDir)
 
 	ttlCleaner := worker.NewTTLCleaner(membershipService, cfg.TTLCleanInterval, log)
 
@@ -72,12 +73,14 @@ func run() error {
 
 	segmentHandler := handler.NewSegmentHandler(segmentService)
 	userHandler := handler.NewUserHandler(userService, membershipService)
+	historyHandler := handler.NewHistoryHandler(historyService)
 
 	router := httptransport.NewRouter(httptransport.RouterDeps{
 		Logger:     log,
 		ReportsDir: cfg.ReportsDir,
 		Segment:    segmentHandler,
 		User:       userHandler,
+		History:    historyHandler,
 	})
 
 	srv := &http.Server{
