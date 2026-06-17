@@ -22,14 +22,19 @@ func NewSegmentRepo(pool *pgxpool.Pool) *SegmentRepo {
 }
 
 func (r *SegmentRepo) Create(ctx context.Context, slug string, autoPercent *int) (domain.Segment, error) {
+	status := domain.StatusApplied
+	if autoPercent != nil {
+		status = domain.StatusPending
+	}
+
 	const q = `
-		INSERT INTO segments (slug, auto_assign_percent)
-		VALUES ($1, $2)
-		RETURNING id, slug, auto_assign_percent, created_at, deleted_at`
+		INSERT INTO segments (slug, auto_assign_percent, status)
+		VALUES ($1, $2, $3)
+		RETURNING id, slug, auto_assign_percent, status, created_at, deleted_at`
 
 	var seg domain.Segment
-	err := r.querier(ctx).QueryRow(ctx, q, slug, autoPercent).
-		Scan(&seg.ID, &seg.Slug, &seg.AutoAssignPercent, &seg.CreatedAt, &seg.DeletedAt)
+	err := r.querier(ctx).QueryRow(ctx, q, slug, autoPercent, string(status)).
+		Scan(&seg.ID, &seg.Slug, &seg.AutoAssignPercent, &seg.Status, &seg.CreatedAt, &seg.DeletedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return domain.Segment{}, domain.ErrSegmentAlreadyExists
@@ -41,13 +46,13 @@ func (r *SegmentRepo) Create(ctx context.Context, slug string, autoPercent *int)
 
 func (r *SegmentRepo) GetBySlug(ctx context.Context, slug string) (domain.Segment, error) {
 	const q = `
-		SELECT id, slug, auto_assign_percent, created_at, deleted_at
+		SELECT id, slug, auto_assign_percent, status, created_at, deleted_at
 		FROM segments
 		WHERE slug = $1 AND deleted_at IS NULL`
 
 	var seg domain.Segment
 	err := r.querier(ctx).QueryRow(ctx, q, slug).
-		Scan(&seg.ID, &seg.Slug, &seg.AutoAssignPercent, &seg.CreatedAt, &seg.DeletedAt)
+		Scan(&seg.ID, &seg.Slug, &seg.AutoAssignPercent, &seg.Status, &seg.CreatedAt, &seg.DeletedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Segment{}, domain.ErrSegmentNotFound
@@ -59,7 +64,7 @@ func (r *SegmentRepo) GetBySlug(ctx context.Context, slug string) (domain.Segmen
 
 func (r *SegmentRepo) List(ctx context.Context) ([]domain.Segment, error) {
 	const q = `
-		SELECT id, slug, auto_assign_percent, created_at, deleted_at
+		SELECT id, slug, auto_assign_percent, status, created_at, deleted_at
 		FROM segments
 		WHERE deleted_at IS NULL
 		ORDER BY id`
@@ -77,7 +82,7 @@ func (r *SegmentRepo) ListBySlugs(ctx context.Context, slugs []string) ([]domain
 	}
 
 	const q = `
-		SELECT id, slug, auto_assign_percent, created_at, deleted_at
+		SELECT id, slug, auto_assign_percent, status, created_at, deleted_at
 		FROM segments
 		WHERE slug = ANY($1::text[]) AND deleted_at IS NULL`
 
@@ -90,7 +95,7 @@ func (r *SegmentRepo) ListBySlugs(ctx context.Context, slugs []string) ([]domain
 
 func (r *SegmentRepo) ListPercentSegments(ctx context.Context) ([]domain.Segment, error) {
 	const q = `
-		SELECT id, slug, auto_assign_percent, created_at, deleted_at
+		SELECT id, slug, auto_assign_percent, status, created_at, deleted_at
 		FROM segments
 		WHERE auto_assign_percent IS NOT NULL AND deleted_at IS NULL
 		ORDER BY id`
@@ -108,7 +113,7 @@ func scanSegments(rows pgx.Rows) ([]domain.Segment, error) {
 	segments := make([]domain.Segment, 0)
 	for rows.Next() {
 		var seg domain.Segment
-		if err := rows.Scan(&seg.ID, &seg.Slug, &seg.AutoAssignPercent, &seg.CreatedAt, &seg.DeletedAt); err != nil {
+		if err := rows.Scan(&seg.ID, &seg.Slug, &seg.AutoAssignPercent, &seg.Status, &seg.CreatedAt, &seg.DeletedAt); err != nil {
 			return nil, fmt.Errorf("postgres: scan segment: %w", err)
 		}
 		segments = append(segments, seg)
@@ -123,6 +128,14 @@ func (r *SegmentRepo) SoftDelete(ctx context.Context, segmentID int64) error {
 	const q = `UPDATE segments SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`
 	if _, err := r.querier(ctx).Exec(ctx, q, segmentID); err != nil {
 		return fmt.Errorf("postgres: soft delete segment: %w", err)
+	}
+	return nil
+}
+
+func (r *SegmentRepo) MarkApplied(ctx context.Context, segmentID int64) error {
+	const q = `UPDATE segments SET status = 'applied' WHERE id = $1`
+	if _, err := r.querier(ctx).Exec(ctx, q, segmentID); err != nil {
+		return fmt.Errorf("postgres: mark segment applied: %w", err)
 	}
 	return nil
 }

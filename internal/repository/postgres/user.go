@@ -37,3 +37,44 @@ func (r *UserRepo) Exists(ctx context.Context, userID uuid.UUID) (bool, error) {
 	}
 	return exists, nil
 }
+
+func (r *UserRepo) Count(ctx context.Context) (int64, error) {
+	const q = `SELECT count(*) FROM users`
+
+	var n int64
+	if err := r.querier(ctx).QueryRow(ctx, q).Scan(&n); err != nil {
+		return 0, fmt.Errorf("postgres: count users: %w", err)
+	}
+	return n, nil
+}
+
+func (r *UserRepo) ListNonMembers(ctx context.Context, segmentID int64, limit int) ([]uuid.UUID, error) {
+	const q = `
+		SELECT u.user_id
+		FROM users u
+		WHERE NOT EXISTS (
+			SELECT 1 FROM user_segments us
+			WHERE us.user_id = u.user_id AND us.segment_id = $1
+		)
+		ORDER BY random()
+		LIMIT $2`
+
+	rows, err := r.querier(ctx).Query(ctx, q, segmentID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list non-members: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]uuid.UUID, 0, limit)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("postgres: scan non-member id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: list non-members rows: %w", err)
+	}
+	return ids, nil
+}

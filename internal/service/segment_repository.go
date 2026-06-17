@@ -17,4 +17,5 @@ type SegmentRepository interface {
 	DeleteMembershipsBySegment(ctx context.Context, segmentID int64) error
 	ListBySlugs(ctx context.Context, slugs []string) ([]domain.Segment, error)
 	ListPercentSegments(ctx context.Context) ([]domain.Segment, error)
+	MarkApplied(ctx context.Context, segmentID int64) error
 }

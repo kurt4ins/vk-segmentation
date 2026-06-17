@@ -15,6 +15,7 @@ import (
 	"github.com/kurt4ins/vk-segmentation/internal/service"
 	httptransport "github.com/kurt4ins/vk-segmentation/internal/transport/http"
 	"github.com/kurt4ins/vk-segmentation/internal/transport/http/handler"
+	"github.com/kurt4ins/vk-segmentation/internal/worker"
 )
 
 func main() {
@@ -55,7 +56,14 @@ func run() error {
 	userRepo := postgres.NewUserRepo(pool)
 	membershipRepo := postgres.NewMembershipRepo(pool)
 
-	segmentService := service.NewSegmentService(segmentRepo, historyRepo, transactor)
+	rolloutService := service.NewRolloutService(userRepo, membershipRepo, historyRepo, segmentRepo, transactor, cfg.RolloutBatchSize)
+	rolloutWorker := worker.NewRolloutWorker(rolloutService, log)
+
+	workerCtx, cancelWorker := context.WithCancel(ctx)
+	defer cancelWorker()
+	go rolloutWorker.Run(workerCtx)
+
+	segmentService := service.NewSegmentService(segmentRepo, historyRepo, transactor, rolloutWorker)
 	userService := service.NewUserService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
 	membershipService := service.NewMembershipService(userRepo, segmentRepo, membershipRepo, historyRepo, transactor)
 
@@ -95,6 +103,14 @@ func run() error {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return err
 	}
+
+	cancelWorker()
+	select {
+	case <-rolloutWorker.Done():
+	case <-time.After(15 * time.Second):
+		log.Warn("rollout worker did not stop in time")
+	}
+
 	log.Info("server stopped")
 	return nil
 }

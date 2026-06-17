@@ -21,6 +21,7 @@ func (r CreateSegmentRequest) Validate() error {
 type SegmentResponse struct {
 	Slug              string    `json:"slug"`
 	AutoAssignPercent *int      `json:"auto_assign_percent,omitempty"`
+	Status            string    `json:"status"`
 	CreatedAt         time.Time `json:"created_at"`
 }
 
@@ -28,6 +29,7 @@ func NewSegmentResponse(s domain.Segment) SegmentResponse {
 	return SegmentResponse{
 		Slug:              s.Slug,
 		AutoAssignPercent: s.AutoAssignPercent,
+		Status:            string(s.Status),
 		CreatedAt:         s.CreatedAt,
 	}
 }
