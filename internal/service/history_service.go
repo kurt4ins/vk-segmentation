@@ -43,7 +43,7 @@ func (s *HistoryService) Report(ctx context.Context, userID uuid.UUID, from, to 
 	if err != nil {
 		return "", fmt.Errorf("history: create report file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	w := csv.NewWriter(f)
 	w.Comma = ';'
