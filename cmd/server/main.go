@@ -20,7 +20,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		os.Stderr.WriteString("fatal: " + err.Error() + "\n")
+		_, _ = os.Stderr.WriteString("fatal: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 }

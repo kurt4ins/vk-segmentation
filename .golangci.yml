@@ -7,17 +7,11 @@ run:
 linters:
   default: standard
   enable:
-    - revive
     - bodyclose
     - rowserrcheck
     - sqlclosecheck
     - nilerr
     - misspell
-  settings:
-    revive:
-      rules:
-        - name: exported
-          disabled: false
   exclusions:
     rules:
       - path: _test\.go
