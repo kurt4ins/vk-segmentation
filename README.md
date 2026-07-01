@@ -136,5 +136,3 @@ make build             # собрать бинарь сервера
 `RUN_MIGRATIONS=true`). Моки генерируются через
 [`go.uber.org/mock`](https://github.com/uber-go/mock) (`mockgen`). CI
 (`.github/workflows/ci.yml`) прогоняет lint + unit + integration + build.
-
-`plan.md` (на русском) — design-документ и источник истины.
